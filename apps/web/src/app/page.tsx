@@ -6,6 +6,8 @@ import { StationCard } from "../components/StationCard";
 import { TopBar } from "../components/TopBar";
 import { initialState } from "../mock/state";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 function formatGameNumber(value: number) {
   const rounded = Math.max(0, Math.floor(value));
 
@@ -192,7 +194,7 @@ export default function Home() {
           return (
             <StationCard
               key={station.id}
-              stationImageSrc={`/ui/stations/station_${station.id}.png`}
+              stationImageSrc={`${basePath}/ui/stations/station_${station.id}.png`}
               stationName={stationConfig.name}
               level={station.level}
               maxLevel={stationConfig.levels.length}

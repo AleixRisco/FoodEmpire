@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 type StationCardProps = {
   stationImageSrc: string;
   stationName: string;
@@ -86,7 +88,7 @@ export function StationCard({
                 }}
               />
               <Image
-                src="/ui/stations/overlays/station_lock.png"
+                src={`${basePath}/ui/stations/overlays/station_lock.png`}
                 alt=""
                 aria-hidden="true"
                 fill
