@@ -9,8 +9,23 @@ import { initialState, type GameState, type StationState } from "../mock/state";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const STORAGE_KEY = "food-empire-game-state";
+const THEME_STORAGE_KEY = "food-empire-theme";
 const COIN_FLIGHT_MS = 800;
 const COIN_COUNTUP_MS = 420;
+
+function getInitialTheme(): "light" | "dark" {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 type StationLevelConfig = {
   level: number;
@@ -201,6 +216,7 @@ function parseStoredState(now: number): GameState {
 export default function Home() {
   const [state, setState] = useState<GameState>(() => parseStoredState(Date.now()));
   const [displayedCoins, setDisplayedCoins] = useState(() => parseStoredState(Date.now()).coins);
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
   const [now, setNow] = useState(() => Date.now());
   const [coinFlights, setCoinFlights] = useState<CoinFlight[]>([]);
   const [isTopBarAnimating, setIsTopBarAnimating] = useState(false);
@@ -218,6 +234,15 @@ export default function Home() {
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     displayedCoinsRef.current = displayedCoins;
@@ -471,6 +496,8 @@ export default function Home() {
           coinsLabel={formatGameNumber(displayedCoins)}
           coinsTargetRef={coinsTargetRef}
           isAnimating={isTopBarAnimating}
+          isDarkMode={theme === "dark"}
+          onToggleDarkMode={() => setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"))}
         />
 
         <h2 style={{ marginTop: 8, marginBottom: 8 }}>Stations</h2>
