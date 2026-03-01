@@ -88,7 +88,7 @@ export function StationCard({
                 }}
               />
               <Image
-                src={`${basePath}/ui/stations/overlays/station_lock.png`}
+                src={`${basePath}/ui/stations/overlays/station_lock.webp`}
                 alt=""
                 aria-hidden="true"
                 fill

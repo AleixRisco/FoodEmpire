@@ -194,7 +194,7 @@ export default function Home() {
           return (
             <StationCard
               key={station.id}
-              stationImageSrc={`${basePath}/ui/stations/station_${station.id}.png`}
+              stationImageSrc={`${basePath}/ui/stations/station_${station.id}.webp`}
               stationName={stationConfig.name}
               level={station.level}
               maxLevel={stationConfig.levels.length}
