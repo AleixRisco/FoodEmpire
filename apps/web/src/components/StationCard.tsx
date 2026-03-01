@@ -55,8 +55,8 @@ export function StationCard({
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           gap: 8,
-          alignItems: "center",
           padding: 6,
           border: "1px solid #ddd",
           borderRadius: 14,
@@ -64,69 +64,21 @@ export function StationCard({
       >
         <div
           style={{
-            width: 56,
-            height: 56,
-            flexShrink: 0,
-            overflow: "hidden",
-            borderRadius: 10,
-            background: "#f3f4f6",
-            position: "relative",
-          }}
-        >
-          <Image
-            src={stationImageSrc}
-            alt={stationName}
-            width={56}
-            height={56}
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-          />
-          {showLockedOverlay && (
-            <>
-              <div
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(0, 0, 0, 0.45)",
-                }}
-              />
-              <Image
-                src={`${basePath}/ui/stations/overlays/station_lock.webp`}
-                alt=""
-                aria-hidden="true"
-                fill
-                style={{ objectFit: "cover" }}
-              />
-            </>
-          )}
-        </div>
-
-        <button
-          onClick={onUpgrade}
-          disabled={!canUpgrade}
-          style={{
-            width: 92,
-            flexShrink: 0,
-            height: 52,
-            padding: 8,
-            borderRadius: 12,
-            border: canUpgrade ? (isUnlockAction ? "1px solid #16a34a" : "1px solid #cbd5e1") : "1px solid #ddd",
-            background: canUpgrade ? (isUnlockAction ? "#22c55e" : "#ffffff") : "transparent",
-            color: canUpgrade ? (isUnlockAction ? "#052e16" : "#0f172a") : "inherit",
-            boxShadow: canUpgrade ? "0 1px 2px rgba(15, 23, 42, 0.08)" : "none",
-            fontSize: 12,
-            opacity: canUpgrade ? 1 : 0.6,
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
-            gap: 2,
-            lineHeight: 1,
+            gap: 6,
+            fontSize: 12,
+            lineHeight: 1.2,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
           }}
         >
-          <span>{upgradeTitle}</span>
-          <span style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {showUpgradeCoinIcon && (
+          <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis" }}>{stationName}</span>
+          <span>|</span>
+          <span>Lv {level}</span>
+          <span>|</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+            {!isLocked && (
               <Image
                 src={`${basePath}/ui/icons/coin.webp`}
                 alt=""
@@ -136,39 +88,92 @@ export function StationCard({
                 style={{ display: "block", borderRadius: 999 }}
               />
             )}
-            <span>{upgradeCostLabel}</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{isLocked ? "Locked" : productionLabel}</span>
           </span>
-        </button>
+          <span>|</span>
+          <span>{isLocked ? "-" : timeLabel}</span>
+        </div>
 
         <div
           style={{
-            flex: 1,
-            minWidth: 0,
             display: "flex",
-            flexDirection: "column",
-            gap: 6,
+            alignItems: "stretch",
+            gap: 8,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              flexShrink: 0,
+              overflow: "hidden",
+              borderRadius: 10,
+              background: "#f3f4f6",
+              position: "relative",
+            }}
+          >
+            <Image
+              src={stationImageSrc}
+              alt={stationName}
+              width={56}
+              height={56}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+            {showLockedOverlay && (
+              <>
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "rgba(0, 0, 0, 0.45)",
+                  }}
+                />
+                <Image
+                  src={`${basePath}/ui/stations/overlays/station_lock.webp`}
+                  alt=""
+                  aria-hidden="true"
+                  fill
+                  style={{ objectFit: "cover" }}
+                />
+              </>
+            )}
+          </div>
+
+          <div
+            style={{
+              width: 92,
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            <button
+              onClick={onUpgrade}
+              disabled={!canUpgrade}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                minWidth: 0,
-                flex: 1,
+                width: "100%",
+                height: 44,
+                padding: 8,
+                borderRadius: 12,
+                border: canUpgrade ? (isUnlockAction ? "1px solid #16a34a" : "1px solid #cbd5e1") : "1px solid #ddd",
+                background: canUpgrade ? (isUnlockAction ? "#22c55e" : "#ffffff") : "transparent",
+                color: canUpgrade ? (isUnlockAction ? "#052e16" : "#0f172a") : "inherit",
+                boxShadow: canUpgrade ? "0 1px 2px rgba(15, 23, 42, 0.08)" : "none",
                 fontSize: 12,
-                lineHeight: 1.2,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
+                opacity: canUpgrade ? 1 : 0.6,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 2,
+                lineHeight: 1,
               }}
             >
-              <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis" }}>{stationName}</span>
-              <span>|</span>
-              <span>Lv {level}</span>
-              <span>|</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                {!isLocked && (
+              <span>{upgradeTitle}</span>
+              <span style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {showUpgradeCoinIcon && (
                   <Image
                     src={`${basePath}/ui/icons/coin.webp`}
                     alt=""
@@ -178,19 +183,41 @@ export function StationCard({
                     style={{ display: "block", borderRadius: 999 }}
                   />
                 )}
-                <span>{isLocked ? "Locked" : productionLabel}</span>
+                <span>{upgradeCostLabel}</span>
               </span>
-              <span>|</span>
-              <span>{isLocked ? "-" : timeLabel}</span>
+            </button>
+
+            <div
+              style={{
+                height: 8,
+                borderRadius: 999,
+                background: "#dbeafe",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${levelProgressPercent}%`,
+                  height: "100%",
+                  background: "#2563eb",
+                }}
+              />
             </div>
 
-            <div style={{ width: 108, flexShrink: 0, marginLeft: "auto" }}>
+            <div style={{ fontSize: 11, color: "#1d4ed8", textAlign: "right" }}>
+              {level}/{maxLevel}
+            </div>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "stretch" }}>
+            <div style={{ width: "100%" }}>
               {!isLocked && !isProducing && !isReadyToCollect && (
                 <button
                   onClick={onStart}
                   style={{
                     width: "100%",
-                    height: 40,
+                    height: "100%",
+                    minHeight: 56,
                     borderRadius: 10,
                     border: "1px solid #16a34a",
                     background: "#22c55e",
@@ -207,7 +234,8 @@ export function StationCard({
                   style={{
                     position: "relative",
                     width: "100%",
-                    height: 40,
+                    minHeight: 56,
+                    height: "100%",
                     borderRadius: 10,
                     border: "1px solid #ddd",
                     overflow: "hidden",
@@ -228,6 +256,7 @@ export function StationCard({
                       position: "relative",
                       zIndex: 1,
                       height: "100%",
+                      minHeight: 56,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -245,7 +274,8 @@ export function StationCard({
                   onClick={onCollect}
                   style={{
                     width: "100%",
-                    height: 40,
+                    minHeight: 56,
+                    height: "100%",
                     borderRadius: 10,
                     border: "1px solid #d97706",
                     background: "#f59e0b",
@@ -268,29 +298,6 @@ export function StationCard({
                 </button>
               )}
             </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                flex: 1,
-                height: 8,
-                borderRadius: 999,
-                background: "#dbeafe",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: `${levelProgressPercent}%`,
-                  height: "100%",
-                  background: "#2563eb",
-                }}
-              />
-            </div>
-            <span style={{ fontSize: 11, color: "#1d4ed8", minWidth: 34, textAlign: "right" }}>
-              {level}/{maxLevel}
-            </span>
           </div>
         </div>
       </div>

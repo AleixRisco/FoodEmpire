@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import stationsData from "../data/stations.json";
 import { StationCard } from "../components/StationCard";
 import { TopBar } from "../components/TopBar";
-import { initialState } from "../mock/state";
+import { initialState, type GameState, type StationState } from "../mock/state";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const STORAGE_KEY = "food-empire-game-state";
 
 function formatGameNumber(value: number) {
   const rounded = Math.max(0, Math.floor(value));
@@ -32,13 +33,83 @@ function formatGameNumber(value: number) {
   return remainderMillions === 0 ? `${billions}b` : `${billions}b ${remainderMillions}m`;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function reconcileStationState(station: StationState, now: number) {
+  if (!station.isProducing || station.productionEndsAt === null || now < station.productionEndsAt) {
+    return station;
+  }
+
+  return {
+    ...station,
+    isProducing: false,
+    productionEndsAt: null,
+    stored: +(station.stored + station.pendingCoins).toFixed(2),
+    pendingCoins: 0,
+  };
+}
+
+function parseStoredState(now: number): GameState {
+  if (typeof window === "undefined") {
+    return initialState;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+
+    if (!raw) {
+      return initialState;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<GameState>;
+    const parsedStations = Array.isArray(parsed.stations) ? parsed.stations : [];
+
+    return {
+      coins: isFiniteNumber(parsed.coins) ? parsed.coins : initialState.coins,
+      stations: initialState.stations.map((station) => {
+        const savedStation = parsedStations.find((item) => item?.id === station.id);
+
+        if (!savedStation) {
+          return station;
+        }
+
+        const mergedStation: StationState = {
+          id: station.id,
+          level: isFiniteNumber(savedStation.level) ? savedStation.level : station.level,
+          stored: isFiniteNumber(savedStation.stored) ? savedStation.stored : station.stored,
+          isProducing: typeof savedStation.isProducing === "boolean" ? savedStation.isProducing : station.isProducing,
+          productionEndsAt:
+            savedStation.productionEndsAt === null || isFiniteNumber(savedStation.productionEndsAt)
+              ? savedStation.productionEndsAt
+              : station.productionEndsAt,
+          pendingCoins: isFiniteNumber(savedStation.pendingCoins) ? savedStation.pendingCoins : station.pendingCoins,
+        };
+
+        return reconcileStationState(mergedStation, now);
+      }),
+    };
+  } catch {
+    return initialState;
+  }
+}
+
 export default function Home() {
-  const [state, setState] = useState(initialState);
+  const [state, setState] = useState<GameState>(() => parseStoredState(Date.now()));
   const [now, setNow] = useState(() => Date.now());
 
   const stationsById = useMemo(() => {
     return new Map(stationsData.map((station) => [station.id, station]));
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [state]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -47,23 +118,7 @@ export default function Home() {
 
       setState((prev) => ({
         ...prev,
-        stations: prev.stations.map((station) => {
-          if (
-            !station.isProducing ||
-            station.productionEndsAt === null ||
-            currentTime < station.productionEndsAt
-          ) {
-            return station;
-          }
-
-          return {
-            ...station,
-            isProducing: false,
-            productionEndsAt: null,
-            stored: +(station.stored + station.pendingCoins).toFixed(2),
-            pendingCoins: 0,
-          };
-        }),
+        stations: prev.stations.map((station) => reconcileStationState(station, currentTime)),
       }));
     }, 1000);
 
