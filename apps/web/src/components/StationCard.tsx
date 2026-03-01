@@ -11,12 +11,13 @@ type StationCardProps = {
   maxLevel: number;
   productionLabel: string;
   timeLabel: string;
-  collectLabel: string;
+  collectAmountLabel: string;
   isProducing: boolean;
   remainingSeconds: number;
   progressPercent: number;
   upgradeTitle: string;
   upgradeCostLabel: string;
+  showUpgradeCoinIcon: boolean;
   canUpgrade: boolean;
   showLockedOverlay: boolean;
   onUpgrade: () => void;
@@ -31,12 +32,13 @@ export function StationCard({
   maxLevel,
   productionLabel,
   timeLabel,
-  collectLabel,
+  collectAmountLabel,
   isProducing,
   remainingSeconds,
   progressPercent,
   upgradeTitle,
   upgradeCostLabel,
+  showUpgradeCoinIcon,
   canUpgrade,
   showLockedOverlay,
   onUpgrade,
@@ -44,8 +46,9 @@ export function StationCard({
   onCollect,
 }: StationCardProps) {
   const isLocked = level === 0;
-  const isReadyToCollect = collectLabel !== "";
+  const isReadyToCollect = collectAmountLabel !== "";
   const levelProgressPercent = maxLevel > 0 ? Math.min(100, (level / maxLevel) * 100) : 0;
+  const isUnlockAction = upgradeTitle === "Unlock";
 
   return (
     <li style={{ listStyle: "none", marginBottom: 10 }}>
@@ -107,9 +110,9 @@ export function StationCard({
             height: 52,
             padding: 8,
             borderRadius: 12,
-            border: canUpgrade ? "1px solid #cbd5e1" : "1px solid #ddd",
-            background: canUpgrade ? "#ffffff" : "transparent",
-            color: canUpgrade ? "#0f172a" : "inherit",
+            border: canUpgrade ? (isUnlockAction ? "1px solid #16a34a" : "1px solid #cbd5e1") : "1px solid #ddd",
+            background: canUpgrade ? (isUnlockAction ? "#22c55e" : "#ffffff") : "transparent",
+            color: canUpgrade ? (isUnlockAction ? "#052e16" : "#0f172a") : "inherit",
             boxShadow: canUpgrade ? "0 1px 2px rgba(15, 23, 42, 0.08)" : "none",
             fontSize: 12,
             opacity: canUpgrade ? 1 : 0.6,
@@ -122,7 +125,19 @@ export function StationCard({
           }}
         >
           <span>{upgradeTitle}</span>
-          <span style={{ fontSize: 11 }}>{upgradeCostLabel}</span>
+          <span style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {showUpgradeCoinIcon && (
+              <Image
+                src={`${basePath}/ui/icons/coin.webp`}
+                alt=""
+                aria-hidden="true"
+                width={12}
+                height={12}
+                style={{ display: "block", borderRadius: 999 }}
+              />
+            )}
+            <span>{upgradeCostLabel}</span>
+          </span>
         </button>
 
         <div
@@ -152,7 +167,19 @@ export function StationCard({
               <span>|</span>
               <span>Lv {level}</span>
               <span>|</span>
-              <span>{isLocked ? "Locked" : productionLabel}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {!isLocked && (
+                  <Image
+                    src={`${basePath}/ui/icons/coin.webp`}
+                    alt=""
+                    aria-hidden="true"
+                    width={12}
+                    height={12}
+                    style={{ display: "block", borderRadius: 999 }}
+                  />
+                )}
+                <span>{isLocked ? "Locked" : productionLabel}</span>
+              </span>
               <span>|</span>
               <span>{isLocked ? "-" : timeLabel}</span>
             </div>
@@ -226,7 +253,18 @@ export function StationCard({
                     fontSize: 12,
                   }}
                 >
-                  {collectLabel}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span>Collect</span>
+                    <Image
+                      src={`${basePath}/ui/icons/coin.webp`}
+                      alt=""
+                      aria-hidden="true"
+                      width={14}
+                      height={14}
+                      style={{ display: "block", borderRadius: 999 }}
+                    />
+                    <span>{collectAmountLabel}</span>
+                  </span>
                 </button>
               )}
             </div>

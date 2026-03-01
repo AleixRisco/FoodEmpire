@@ -200,7 +200,7 @@ export default function Home() {
               maxLevel={stationConfig.levels.length}
               productionLabel={currentLevel ? formatGameNumber(currentLevel.coinsReward) : "-"}
               timeLabel={currentLevel ? `${currentLevel.productionSeconds}s` : "-"}
-              collectLabel={station.stored > 0 ? `Collect ${formatGameNumber(station.stored)}` : ""}
+              collectAmountLabel={station.stored > 0 ? formatGameNumber(station.stored) : ""}
               isProducing={station.isProducing}
               remainingSeconds={remainingSeconds}
               progressPercent={progressPercent}
@@ -220,6 +220,7 @@ export default function Home() {
                     : formatGameNumber(nextLevel.cost)
                   : "level"
               }
+              showUpgradeCoinIcon={nextLevel !== undefined && !isBlockedByPrevious}
               canUpgrade={nextLevel !== undefined && !isBlockedByPrevious && state.coins >= nextLevel.cost}
               showLockedOverlay={station.level === 0}
               onUpgrade={() => onUpgrade(station.id)}
