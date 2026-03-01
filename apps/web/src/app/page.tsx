@@ -426,7 +426,18 @@ export default function Home() {
   };
 
   return (
-    <main style={{ padding: 16, fontFamily: "system-ui" }}>
+    <main
+      style={{
+        height: "100dvh",
+        padding: 16,
+        fontFamily: "system-ui",
+        background: "var(--background)",
+        color: "var(--foreground)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       <style>{`
         @keyframes coin-flight {
           0% {
@@ -442,18 +453,39 @@ export default function Home() {
           }
         }
       `}</style>
-      <h1 style={{ marginBottom: 8 }}>Food Empire</h1>
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          background: "var(--background)",
+          color: "inherit",
+          paddingBottom: 8,
+          flexShrink: 0,
+          boxShadow: "0 1px 0 rgba(127, 127, 127, 0.16)",
+        }}
+      >
+        <h1 style={{ marginBottom: 8 }}>Food Empire</h1>
 
-      <TopBar
-        coinsLabel={formatGameNumber(displayedCoins)}
-        coinsTargetRef={coinsTargetRef}
-        isAnimating={isTopBarAnimating}
-      />
+        <TopBar
+          coinsLabel={formatGameNumber(displayedCoins)}
+          coinsTargetRef={coinsTargetRef}
+          isAnimating={isTopBarAnimating}
+        />
 
-      <h2 style={{ marginTop: 8, marginBottom: 8 }}>Stations</h2>
+        <h2 style={{ marginTop: 8, marginBottom: 8 }}>Stations</h2>
+      </div>
 
-      <ul style={{ paddingLeft: 0, margin: 0 }}>
-        {state.stations.map((station, index) => {
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          paddingBottom: 8,
+        }}
+      >
+        <ul style={{ paddingLeft: 0, margin: 0 }}>
+          {state.stations.map((station, index) => {
           const stationConfig = stationsById.get(station.id);
           const currentLevel = stationConfig?.levels.find((level) => level.level === station.level);
           const nextLevel = stationConfig?.levels.find((level) => level.level === station.level + 1);
@@ -528,8 +560,9 @@ export default function Home() {
               progressTransitionEnabled={progressTransitionEnabled}
             />
           );
-        })}
-      </ul>
+          })}
+        </ul>
+      </div>
 
       <div style={{ pointerEvents: "none", position: "fixed", inset: 0, zIndex: 50 }}>
         {coinFlights.map((flight) => (
