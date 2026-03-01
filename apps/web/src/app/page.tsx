@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import stationsData from "../data/stations.json";
 import { StationCard } from "../components/StationCard";
 import { TopBar } from "../components/TopBar";
@@ -8,6 +9,17 @@ import { initialState, type GameState, type StationState } from "../mock/state";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const STORAGE_KEY = "food-empire-game-state";
+const COIN_FLIGHT_MS = 800;
+const COIN_COUNTUP_MS = 420;
+
+type CoinFlight = {
+  id: number;
+  startX: number;
+  startY: number;
+  deltaX: number;
+  deltaY: number;
+  delayMs: number;
+};
 
 function formatGameNumber(value: number) {
   const rounded = Math.max(0, Math.floor(value));
@@ -97,7 +109,14 @@ function parseStoredState(now: number): GameState {
 
 export default function Home() {
   const [state, setState] = useState<GameState>(() => parseStoredState(Date.now()));
+  const [displayedCoins, setDisplayedCoins] = useState(() => parseStoredState(Date.now()).coins);
   const [now, setNow] = useState(() => Date.now());
+  const [coinFlights, setCoinFlights] = useState<CoinFlight[]>([]);
+  const [isTopBarAnimating, setIsTopBarAnimating] = useState(false);
+  const coinsTargetRef = useRef<HTMLSpanElement | null>(null);
+  const flightIdRef = useRef(0);
+  const countupFrameRef = useRef<number | null>(null);
+  const displayedCoinsRef = useRef(displayedCoins);
 
   const stationsById = useMemo(() => {
     return new Map(stationsData.map((station) => [station.id, station]));
@@ -110,6 +129,53 @@ export default function Home() {
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    displayedCoinsRef.current = displayedCoins;
+  }, [displayedCoins]);
+
+  useEffect(() => {
+    if (countupFrameRef.current !== null) {
+      window.cancelAnimationFrame(countupFrameRef.current);
+    }
+
+    const from = displayedCoinsRef.current;
+    const to = state.coins;
+
+    if (Math.abs(to - from) < 0.01) {
+      countupFrameRef.current = window.requestAnimationFrame(() => {
+        setDisplayedCoins(to);
+        countupFrameRef.current = null;
+      });
+      return;
+    }
+
+    const startedAt = performance.now();
+
+    const tick = (timestamp: number) => {
+      const elapsed = timestamp - startedAt;
+      const progress = Math.min(1, elapsed / COIN_COUNTUP_MS);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const nextValue = from + (to - from) * eased;
+
+      setDisplayedCoins(progress === 1 ? to : nextValue);
+
+      if (progress < 1) {
+        countupFrameRef.current = window.requestAnimationFrame(tick);
+      } else {
+        countupFrameRef.current = null;
+      }
+    };
+
+    countupFrameRef.current = window.requestAnimationFrame(tick);
+
+    return () => {
+      if (countupFrameRef.current !== null) {
+        window.cancelAnimationFrame(countupFrameRef.current);
+        countupFrameRef.current = null;
+      }
+    };
+  }, [state.coins]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -186,7 +252,45 @@ export default function Home() {
     });
   };
 
-  const onCollectStation = (stationId: string) => {
+  const spawnCoinFlight = (sourceRect: DOMRect) => {
+    const targetRect = coinsTargetRef.current?.getBoundingClientRect();
+
+    if (!targetRect) {
+      return;
+    }
+
+    const sourceX = sourceRect.left + sourceRect.width / 2;
+    const sourceY = sourceRect.top + sourceRect.height / 2;
+    const targetX = targetRect.left + targetRect.width / 2;
+    const targetY = targetRect.top + targetRect.height / 2;
+
+    const nextFlights = Array.from({ length: 4 }, (_, index) => {
+      flightIdRef.current += 1;
+
+      return {
+        id: flightIdRef.current,
+        startX: sourceX + (index - 1.5) * 6,
+        startY: sourceY - index * 3,
+        deltaX: targetX - (sourceX + (index - 1.5) * 6),
+        deltaY: targetY - (sourceY - index * 3),
+        delayMs: index * 60,
+      };
+    });
+
+    setCoinFlights((prev) => [...prev, ...nextFlights]);
+
+    window.setTimeout(() => {
+      setCoinFlights((prev) => prev.filter((flight) => !nextFlights.some((item) => item.id === flight.id)));
+      setIsTopBarAnimating(true);
+      window.setTimeout(() => {
+        setIsTopBarAnimating(false);
+      }, 180);
+    }, COIN_FLIGHT_MS + nextFlights[nextFlights.length - 1].delayMs);
+  };
+
+  const onCollectStationAnimated = (stationId: string, sourceRect: DOMRect) => {
+    spawnCoinFlight(sourceRect);
+
     setState((prev) => {
       const station = prev.stations.find((item) => item.id === stationId);
 
@@ -211,9 +315,28 @@ export default function Home() {
 
   return (
     <main style={{ padding: 16, fontFamily: "system-ui" }}>
+      <style>{`
+        @keyframes coin-flight {
+          0% {
+            opacity: 0;
+            transform: translate3d(0, 0, 0) scale(0.72);
+          }
+          15% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+            transform: translate3d(var(--coin-x), var(--coin-y), 0) scale(0.5);
+          }
+        }
+      `}</style>
       <h1 style={{ marginBottom: 8 }}>Food Empire</h1>
 
-      <TopBar coinsLabel={formatGameNumber(state.coins)} />
+      <TopBar
+        coinsLabel={formatGameNumber(displayedCoins)}
+        coinsTargetRef={coinsTargetRef}
+        isAnimating={isTopBarAnimating}
+      />
 
       <h2 style={{ marginTop: 8, marginBottom: 8 }}>Stations</h2>
 
@@ -280,11 +403,45 @@ export default function Home() {
               showLockedOverlay={station.level === 0}
               onUpgrade={() => onUpgrade(station.id)}
               onStart={() => onStartProduction(station.id)}
-              onCollect={() => onCollectStation(station.id)}
+              onCollect={(sourceRect) => onCollectStationAnimated(station.id, sourceRect)}
             />
           );
         })}
       </ul>
+
+      <div style={{ pointerEvents: "none", position: "fixed", inset: 0, zIndex: 50 }}>
+        {coinFlights.map((flight) => (
+          <span
+            key={flight.id}
+            style={{
+              position: "fixed",
+              left: flight.startX,
+              top: flight.startY,
+              marginLeft: -11,
+              marginTop: -11,
+              width: 22,
+              height: 22,
+              display: "block",
+              animationName: "coin-flight",
+              animationDuration: `${COIN_FLIGHT_MS}ms`,
+              animationDelay: `${flight.delayMs}ms`,
+              animationTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+              animationFillMode: "forwards",
+              ["--coin-x" as string]: `${flight.deltaX}px`,
+              ["--coin-y" as string]: `${flight.deltaY}px`,
+            }}
+          >
+            <Image
+              src={`${basePath}/ui/icons/coin.webp`}
+              alt=""
+              aria-hidden="true"
+              width={22}
+              height={22}
+              style={{ display: "block", borderRadius: 999 }}
+            />
+          </span>
+        ))}
+      </div>
     </main>
   );
 }

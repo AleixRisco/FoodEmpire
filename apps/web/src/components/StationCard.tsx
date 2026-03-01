@@ -22,7 +22,7 @@ type StationCardProps = {
   showLockedOverlay: boolean;
   onUpgrade: () => void;
   onStart: () => void;
-  onCollect: () => void;
+  onCollect: (sourceRect: DOMRect) => void;
 };
 
 export function StationCard({
@@ -271,7 +271,7 @@ export function StationCard({
 
               {!isLocked && isReadyToCollect && (
                 <button
-                  onClick={onCollect}
+                  onClick={(event) => onCollect(event.currentTarget.getBoundingClientRect())}
                   style={{
                     width: "100%",
                     minHeight: 56,
