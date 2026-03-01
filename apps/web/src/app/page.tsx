@@ -12,6 +12,25 @@ const STORAGE_KEY = "food-empire-game-state";
 const COIN_FLIGHT_MS = 800;
 const COIN_COUNTUP_MS = 420;
 
+type StationLevelConfig = {
+  level: number;
+  cost: number;
+  productionSeconds: number;
+  coinsReward: number;
+};
+
+type StationConfig = {
+  id: string;
+  name: string;
+  manager?: {
+    unlockLevel: number;
+  };
+  levels: StationLevelConfig[];
+};
+
+const stationsConfig = stationsData as StationConfig[];
+const stationsConfigById = new Map(stationsConfig.map((station) => [station.id, station]));
+
 type CoinFlight = {
   id: number;
   startX: number;
@@ -20,6 +39,10 @@ type CoinFlight = {
   deltaY: number;
   delayMs: number;
 };
+
+function hasUnlockedManager(station: StationState, unlockLevel: number | undefined) {
+  return unlockLevel !== undefined && station.level >= unlockLevel;
+}
 
 function formatGameNumber(value: number) {
   const rounded = Math.max(0, Math.floor(value));
@@ -45,22 +68,85 @@ function formatGameNumber(value: number) {
   return remainderMillions === 0 ? `${billions}b` : `${billions}b ${remainderMillions}m`;
 }
 
+function formatDuration(totalSeconds: number) {
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+
+  if (totalSeconds < 3600) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
 function reconcileStationState(station: StationState, now: number) {
-  if (!station.isProducing || station.productionEndsAt === null || now < station.productionEndsAt) {
-    return station;
+  const stationConfig = stationsConfigById.get(station.id);
+  const currentLevel = stationConfig?.levels.find((level) => level.level === station.level);
+  const managerUnlocked = hasUnlockedManager(station, stationConfig?.manager?.unlockLevel);
+
+  if (!stationConfig || !currentLevel || station.level === 0) {
+    return {
+      station: {
+        ...station,
+        hasManager: managerUnlocked ? true : station.hasManager,
+      },
+      coinsGained: 0,
+    };
   }
 
-  return {
-    ...station,
-    isProducing: false,
-    productionEndsAt: null,
-    stored: +(station.stored + station.pendingCoins).toFixed(2),
-    pendingCoins: 0,
-  };
+  let nextStation = station;
+  let coinsGained = 0;
+
+  if (station.isProducing && station.productionEndsAt !== null && now >= station.productionEndsAt) {
+    if (station.hasManager) {
+      coinsGained += station.pendingCoins;
+      nextStation = {
+        ...station,
+        isProducing: false,
+        productionEndsAt: null,
+        productionDurationSeconds: null,
+        stored: 0,
+        pendingCoins: 0,
+      };
+    } else {
+      nextStation = {
+        ...station,
+        isProducing: false,
+        productionEndsAt: null,
+        productionDurationSeconds: null,
+        stored: +(station.stored + station.pendingCoins).toFixed(2),
+        pendingCoins: 0,
+      };
+    }
+  }
+
+  if (managerUnlocked) {
+    nextStation = {
+      ...nextStation,
+      hasManager: true,
+    };
+  }
+
+  if (nextStation.hasManager && !nextStation.isProducing && nextStation.stored <= 0) {
+    nextStation = {
+      ...nextStation,
+      isProducing: true,
+      productionEndsAt: now + currentLevel.productionSeconds * 1000,
+      productionDurationSeconds: currentLevel.productionSeconds,
+      pendingCoins: currentLevel.coinsReward,
+    };
+  }
+
+  return { station: nextStation, coinsGained };
 }
 
 function parseStoredState(now: number): GameState {
@@ -90,16 +176,21 @@ function parseStoredState(now: number): GameState {
         const mergedStation: StationState = {
           id: station.id,
           level: isFiniteNumber(savedStation.level) ? savedStation.level : station.level,
+          hasManager: typeof savedStation.hasManager === "boolean" ? savedStation.hasManager : station.hasManager,
           stored: isFiniteNumber(savedStation.stored) ? savedStation.stored : station.stored,
           isProducing: typeof savedStation.isProducing === "boolean" ? savedStation.isProducing : station.isProducing,
           productionEndsAt:
             savedStation.productionEndsAt === null || isFiniteNumber(savedStation.productionEndsAt)
               ? savedStation.productionEndsAt
               : station.productionEndsAt,
+          productionDurationSeconds:
+            savedStation.productionDurationSeconds === null || isFiniteNumber(savedStation.productionDurationSeconds)
+              ? savedStation.productionDurationSeconds
+              : station.productionDurationSeconds,
           pendingCoins: isFiniteNumber(savedStation.pendingCoins) ? savedStation.pendingCoins : station.pendingCoins,
         };
 
-        return reconcileStationState(mergedStation, now);
+        return reconcileStationState(mergedStation, now).station;
       }),
     };
   } catch {
@@ -118,9 +209,7 @@ export default function Home() {
   const countupFrameRef = useRef<number | null>(null);
   const displayedCoinsRef = useRef(displayedCoins);
 
-  const stationsById = useMemo(() => {
-    return new Map(stationsData.map((station) => [station.id, station]));
-  }, []);
+  const stationsById = useMemo(() => stationsConfigById, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -182,10 +271,20 @@ export default function Home() {
       const currentTime = Date.now();
       setNow(currentTime);
 
-      setState((prev) => ({
-        ...prev,
-        stations: prev.stations.map((station) => reconcileStationState(station, currentTime)),
-      }));
+      setState((prev) => {
+        let coinsGained = 0;
+        const stations = prev.stations.map((station) => {
+          const result = reconcileStationState(station, currentTime);
+          coinsGained += result.coinsGained;
+          return result.station;
+        });
+
+        return {
+          ...prev,
+          coins: +(prev.coins + coinsGained).toFixed(2),
+          stations,
+        };
+      });
     }, 1000);
 
     return () => clearInterval(id);
@@ -206,6 +305,10 @@ export default function Home() {
         return prev;
       }
 
+      const managerUnlocked =
+        stationConfig.manager?.unlockLevel !== undefined && nextLevel.level >= stationConfig.manager.unlockLevel;
+      const shouldAutoStart = managerUnlocked && !station.isProducing;
+
       return {
         ...prev,
         coins: +(prev.coins - nextLevel.cost).toFixed(2),
@@ -214,6 +317,14 @@ export default function Home() {
             ? {
                 ...item,
                 level: nextLevel.level,
+                hasManager: managerUnlocked ? true : item.hasManager,
+                stored: shouldAutoStart ? 0 : item.stored,
+                isProducing: shouldAutoStart ? true : item.isProducing,
+                productionEndsAt: shouldAutoStart ? Date.now() + nextLevel.productionSeconds * 1000 : item.productionEndsAt,
+                productionDurationSeconds: shouldAutoStart
+                  ? nextLevel.productionSeconds
+                  : item.productionDurationSeconds,
+                pendingCoins: shouldAutoStart ? nextLevel.coinsReward : item.pendingCoins,
               }
             : item
         ),
@@ -244,6 +355,7 @@ export default function Home() {
                 ...item,
                 isProducing: true,
                 productionEndsAt: Date.now() + currentLevel.productionSeconds * 1000,
+                productionDurationSeconds: currentLevel.productionSeconds,
                 pendingCoins: currentLevel.coinsReward,
               }
             : item
@@ -345,8 +457,14 @@ export default function Home() {
           const stationConfig = stationsById.get(station.id);
           const currentLevel = stationConfig?.levels.find((level) => level.level === station.level);
           const nextLevel = stationConfig?.levels.find((level) => level.level === station.level + 1);
+          const managerConfig = stationConfig?.manager;
           const previousStation = index > 0 ? state.stations[index - 1] : null;
           const isBlockedByPrevious = station.level === 0 && previousStation !== null && previousStation.level === 0;
+          const managerUnlocked = managerConfig !== undefined && station.level >= managerConfig.unlockLevel;
+          const activeProductionSeconds = station.isProducing
+            ? station.productionDurationSeconds ?? currentLevel?.productionSeconds ?? 0
+            : currentLevel?.productionSeconds ?? 0;
+          const activeProductionCoins = station.isProducing ? station.pendingCoins : currentLevel?.coinsReward ?? 0;
           const remainingSeconds =
             station.isProducing && station.productionEndsAt !== null
               ? Math.max(0, Math.ceil((station.productionEndsAt - now) / 1000))
@@ -354,16 +472,16 @@ export default function Home() {
           const progressPercent =
             station.isProducing &&
             station.productionEndsAt !== null &&
-            currentLevel !== undefined &&
-            currentLevel.productionSeconds > 0
+            activeProductionSeconds > 0
               ? Math.min(
                   1,
                   Math.max(
                     0,
-                    1 - (station.productionEndsAt - now) / (currentLevel.productionSeconds * 1000)
+                    1 - (station.productionEndsAt - now) / (activeProductionSeconds * 1000)
                   )
                 )
               : 0;
+          const progressTransitionEnabled = progressPercent > 0;
 
           if (!stationConfig) {
             return null;
@@ -373,14 +491,15 @@ export default function Home() {
             <StationCard
               key={station.id}
               stationImageSrc={`${basePath}/ui/stations/station_${station.id}.webp`}
+              managerImageSrc={`${basePath}/ui/managers/manager_${station.id}.webp`}
               stationName={stationConfig.name}
               level={station.level}
               maxLevel={stationConfig.levels.length}
-              productionLabel={currentLevel ? formatGameNumber(currentLevel.coinsReward) : "-"}
-              timeLabel={currentLevel ? `${currentLevel.productionSeconds}s` : "-"}
+              productionLabel={currentLevel ? formatGameNumber(activeProductionCoins) : "-"}
+              timeLabel={currentLevel ? formatDuration(activeProductionSeconds) : "-"}
               collectAmountLabel={station.stored > 0 ? formatGameNumber(station.stored) : ""}
               isProducing={station.isProducing}
-              remainingSeconds={remainingSeconds}
+              remainingLabel={formatDuration(remainingSeconds)}
               progressPercent={progressPercent}
               upgradeTitle={
                 nextLevel
@@ -400,10 +519,13 @@ export default function Home() {
               }
               showUpgradeCoinIcon={nextLevel !== undefined && !isBlockedByPrevious}
               canUpgrade={nextLevel !== undefined && !isBlockedByPrevious && state.coins >= nextLevel.cost}
+              hasManager={station.hasManager || managerUnlocked}
+              showManagerLockedOverlay={!(station.hasManager || managerUnlocked)}
               showLockedOverlay={station.level === 0}
               onUpgrade={() => onUpgrade(station.id)}
               onStart={() => onStartProduction(station.id)}
               onCollect={(sourceRect) => onCollectStationAnimated(station.id, sourceRect)}
+              progressTransitionEnabled={progressTransitionEnabled}
             />
           );
         })}

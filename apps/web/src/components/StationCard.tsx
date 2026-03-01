@@ -6,6 +6,7 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 type StationCardProps = {
   stationImageSrc: string;
+  managerImageSrc: string;
   stationName: string;
   level: number;
   maxLevel: number;
@@ -13,20 +14,24 @@ type StationCardProps = {
   timeLabel: string;
   collectAmountLabel: string;
   isProducing: boolean;
-  remainingSeconds: number;
+  remainingLabel: string;
   progressPercent: number;
   upgradeTitle: string;
   upgradeCostLabel: string;
   showUpgradeCoinIcon: boolean;
   canUpgrade: boolean;
+  hasManager: boolean;
+  showManagerLockedOverlay: boolean;
   showLockedOverlay: boolean;
   onUpgrade: () => void;
   onStart: () => void;
   onCollect: (sourceRect: DOMRect) => void;
+  progressTransitionEnabled: boolean;
 };
 
 export function StationCard({
   stationImageSrc,
+  managerImageSrc,
   stationName,
   level,
   maxLevel,
@@ -34,16 +39,19 @@ export function StationCard({
   timeLabel,
   collectAmountLabel,
   isProducing,
-  remainingSeconds,
+  remainingLabel,
   progressPercent,
   upgradeTitle,
   upgradeCostLabel,
   showUpgradeCoinIcon,
   canUpgrade,
+  hasManager,
+  showManagerLockedOverlay,
   showLockedOverlay,
   onUpgrade,
   onStart,
   onCollect,
+  progressTransitionEnabled,
 }: StationCardProps) {
   const isLocked = level === 0;
   const isReadyToCollect = collectAmountLabel !== "";
@@ -189,6 +197,7 @@ export function StationCard({
 
             <div
               style={{
+                position: "relative",
                 height: 8,
                 borderRadius: 999,
                 background: "#dbeafe",
@@ -202,16 +211,95 @@ export function StationCard({
                   background: "#2563eb",
                 }}
               />
+              <span
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  fontSize: 10,
+                  color: "#ffffff",
+                  lineHeight: 1,
+                  textShadow:
+                    "0 1px 0 rgba(0,0,0,0.9), 1px 0 0 rgba(0,0,0,0.9), -1px 0 0 rgba(0,0,0,0.9), 0 -1px 0 rgba(0,0,0,0.9)",
+                  pointerEvents: "none",
+                }}
+              >
+                {level}/{maxLevel}
+              </span>
+            </div>
+          </div>
+
+          <div
+            style={{
+              width: 52,
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                margin: "0 auto",
+                overflow: "hidden",
+                borderRadius: 10,
+                background: hasManager ? "#dbeafe" : "#f3f4f6",
+                position: "relative",
+                border: hasManager ? "1px solid #93c5fd" : "1px solid transparent",
+              }}
+            >
+              <Image
+                src={managerImageSrc}
+                alt={`${stationName} manager`}
+                width={44}
+                height={44}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+              {showManagerLockedOverlay && (
+                <>
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: "rgba(0, 0, 0, 0.45)",
+                    }}
+                  />
+                  <Image
+                    src={`${basePath}/ui/stations/overlays/station_lock.webp`}
+                    alt=""
+                    aria-hidden="true"
+                    fill
+                    style={{ objectFit: "cover" }}
+                  />
+                </>
+              )}
             </div>
 
-            <div style={{ fontSize: 11, color: "#1d4ed8", textAlign: "right" }}>
-              {level}/{maxLevel}
+            <div
+              style={{
+                height: 8,
+                color: hasManager ? "#1d4ed8" : "#6b7280",
+                fontSize: 9,
+                textAlign: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                lineHeight: 1,
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {hasManager ? "AUTO" : "LVL 5"}
             </div>
           </div>
 
           <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "stretch" }}>
             <div style={{ width: "100%" }}>
-              {!isLocked && !isProducing && !isReadyToCollect && (
+              {!isLocked && !hasManager && !isProducing && !isReadyToCollect && (
                 <button
                   onClick={onStart}
                   style={{
@@ -248,7 +336,7 @@ export function StationCard({
                       inset: 0,
                       width: `${progressPercent * 100}%`,
                       background: "#f59e0b",
-                      transition: "width 1s linear",
+                      transition: progressTransitionEnabled ? "width 1s linear" : "none",
                     }}
                   />
                   <div
@@ -264,12 +352,12 @@ export function StationCard({
                       color: "#1f2937",
                     }}
                   >
-                    {remainingSeconds}s
+                    {hasManager ? `Auto ${remainingLabel}` : remainingLabel}
                   </div>
                 </div>
               )}
 
-              {!isLocked && isReadyToCollect && (
+              {!isLocked && !hasManager && isReadyToCollect && (
                 <button
                   onClick={(event) => onCollect(event.currentTarget.getBoundingClientRect())}
                   style={{
